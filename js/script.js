@@ -4,7 +4,8 @@ const global = {
         term: '',
         type: '',
         page: 1,
-        totalPages: 1
+        totalPages: 1,
+        totalResults: 0
     },
     api: {
         API_URL : 'https://api.themoviedb.org/3/',
@@ -216,7 +217,6 @@ function hideSpinner(){
 async function search(){
     
     const queryString = document.location.search;
-    console.log(queryString);
     const urlParams = new URLSearchParams(queryString);
 
     global.search.type = urlParams.get('type')
@@ -224,9 +224,13 @@ async function search(){
 
     if(global.search.term !== '' && global.search.term !==null){
         // @todo - make request and display results.
-        const {results, total_pages, page} = await searchAPIData();
-        console.log(results);
+        const {results, total_pages, page, total_results} = await searchAPIData();
         
+        global.search.page = page;
+        global.search.totalPages = total_pages;
+        global.search.totalResults = total_results;
+
+
         if(results.length === 0){
             showAlert('No results found');
         }
@@ -241,6 +245,10 @@ async function search(){
 }
 
 function displaySearchResults(results){
+
+
+    document.querySelector('#search-results').innerHTML = '';    
+    document.querySelector('#pagination').innerHTML = '';    
 
     results.forEach((result)=>{
         const div = document.createElement('div');
@@ -272,10 +280,55 @@ function displaySearchResults(results){
             </p>
           </div>
         `;
-
+        
         document.querySelector('#search-results').appendChild(div);
-    
+        
     })
+    
+    document.querySelector('#search-results-heading').innerHTML = `
+        <h2>${results.length} of ${global.search.totalResults} for ${global.search.term}</h2>
+    `;
+
+    displayPagination();
+}
+
+// Display Pagination 
+
+function displayPagination(){
+    const div = document.createElement('div');
+    div.classList.add('pagination');
+    div.innerHTML = 
+    `
+    <button class="btn btn-primary" id="prev">Prev</button>
+          <button class="btn btn-primary" id="next">Next</button>
+          <div class="page-counter">Page ${global.search.page} of ${global.search.totalPages}</div>
+    `;
+
+    document.querySelector('#pagination').appendChild(div);
+    
+    // Disable prev btn if we are in first page.
+    if(global.search.page === 1 ){
+        document.querySelector('#prev').disabled = true;
+    }
+
+    // Disable next btn if we are in last page.
+    if(global.search.page === global.search.totalPages){
+        document.querySelector('#next').disabled = true;
+    }
+
+    // Next page
+    document.querySelector('#next').addEventListener('click',async ()=>{
+        global.search.page += 1;
+        const {results} = await searchAPIData();
+        await displaySearchResults(results);
+    });
+    
+    // Prev page
+    document.querySelector('#prev').addEventListener('click',async ()=>{
+        global.search.page -= 1;
+        const {results} = await searchAPIData();
+        await displaySearchResults(results);
+    });
 
 }
 
@@ -341,7 +394,7 @@ async function searchAPIData(){
     const API_URL = global.api.API_URL;
     const API_KEY = global.api.API_KEY;
     showSpinner();
-    const response = await fetch(`${API_URL}search/${global.search.type}?api_key=${API_KEY}&language=en-US&query=${global.search.term}`);
+    const response = await fetch(`${API_URL}search/${global.search.type}?api_key=${API_KEY}&language=en-US&query=${global.search.term}&page=${global.search.page}`);
     const data = await response.json();
     hideSpinner();
     return data;
